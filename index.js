@@ -57,29 +57,38 @@ async function scanRound(round) {
     const rayPairs = await getRaydiumPairs();
     const queue = [...mints];
 
-    console.log(`🔄 Round ${round} with ${mints.length} tokens`);
+    let scanned = 0;
+    const total = mints.length;
+
+    process.stdout.write(`🌀 Vòng ${round}: Bắt đầu quét ${total} token...\n`);
 
     async function worker() {
       while (queue.length) {
         const mint = queue.shift();
         const price = await getTokenPrice(mint, rayPairs);
+
         if (price) {
           await fetch("https://test.pumpvote.com/api/add-token-metadata", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              mint, currentPrice: price.value,
+              mint,
+              currentPrice: price.value,
               lastUpdated: new Date().toISOString()
             }),
             agent
           });
         }
+
+        scanned++;
+        process.stdout.write(`\r✅ Vòng ${round}: Đã quét ${scanned}/${total} token...`);
+
         await delay(DELAY_MS);
       }
     }
 
     await Promise.all(Array(CONCURRENCY).fill().map(() => worker()));
-    console.log(`✅ Done round ${round}`);
+    process.stdout.write(`\r✅ Vòng ${round} hoàn tất (${total}/${total})\n`);
   } catch (err) {
     console.error("❌ Scan error:", err.message);
   }
