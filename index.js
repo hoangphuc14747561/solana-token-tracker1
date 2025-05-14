@@ -4,9 +4,9 @@ import https from "https";
 const agent = new https.Agent({ rejectUnauthorized: false });
 
 const WSOL = "So11111111111111111111111111111111111111112";
-const CONCURRENCY = 3;
-const DELAY_MS = 1000;
-const ROUND_DELAY_MS = 4000;
+const CONCURRENCY = 1;
+const DELAY_MS = 2300;
+const ROUND_DELAY_MS = 5000;
 const AMOUNT = 100_000_000;
 
 function delay(ms) {
