@@ -60,7 +60,7 @@ async function scanRound(round) {
     let scanned = 0;
     const total = mints.length;
 
-    process.stdout.write(`🌀 Vòng ${round}: Bắt đầu quét ${total} token...\n`);
+    process.stdout.write(`🌀 Vòng ${round}: Bắt đầu quét ${total} token...\r`);
 
     async function worker() {
       while (queue.length) {
@@ -81,14 +81,13 @@ async function scanRound(round) {
         }
 
         scanned++;
-        process.stdout.write(`\r✅ Vòng ${round}: Đã quét ${scanned}/${total} token...`);
-
+        process.stdout.write(`✅ Vòng ${round}: Đã quét ${scanned}/${total} token...\r`);
         await delay(DELAY_MS);
       }
     }
 
     await Promise.all(Array(CONCURRENCY).fill().map(() => worker()));
-    process.stdout.write(`\r✅ Vòng ${round} hoàn tất (${total}/${total})\n`);
+    process.stdout.write(`✅ Vòng ${round} hoàn tất (${total}/${total})                \n`);
   } catch (err) {
     console.error("❌ Scan error:", err.message);
   }
