@@ -5,7 +5,7 @@ const agent = new https.Agent({ rejectUnauthorized: false });
 
 const WSOL = "So11111111111111111111111111111111111111112";
 const CONCURRENCY = 1;
-const DELAY_MS = 2300;
+const DELAY_MS = 2400;
 const ROUND_DELAY_MS = 5000;
 const AMOUNT = 100_000_000;
 
