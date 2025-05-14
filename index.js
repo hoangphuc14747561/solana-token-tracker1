@@ -1,4 +1,7 @@
 import fetch from "node-fetch";
+import https from "https";
+
+const agent = new https.Agent({ rejectUnauthorized: false });
 
 const WSOL = "So11111111111111111111111111111111111111112";
 const CONCURRENCY = 1;
@@ -63,7 +66,7 @@ async function getTokenPrice(mint) {
 async function scanRound(round) {
   console.log(`🔁 Vòng ${round} bắt đầu...`);
   try {
-    const res = await fetch("https://test.pumpvote.com/api/token-metadata2");
+    const res = await fetch("https://test.pumpvote.com/api/token-metadata2", { agent });
     const data = await res.json();
     const mints = data.map(x => x.mint).filter(Boolean);
     const total = mints.length;
@@ -83,7 +86,8 @@ async function scanRound(round) {
           await fetch("https://test.pumpvote.com/api/add-token-metadata", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ mint, currentPrice: priceData.value, lastUpdated: timestamp })
+            body: JSON.stringify({ mint, currentPrice: priceData.value, lastUpdated: timestamp }),
+            agent
           });
         } else {
           console.log(`❌ ${mint}: Không có giá`);
