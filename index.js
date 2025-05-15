@@ -1,8 +1,11 @@
+const express = require("express");
 const fetch = require("node-fetch");
 const https = require("https");
 
-const agent = new https.Agent({ rejectUnauthorized: false });
+const app = express();
+const PORT = process.env.PORT || 3000;
 
+const agent = new https.Agent({ rejectUnauthorized: false });
 const WSOL = "So11111111111111111111111111111111111111112";
 const DELAY_MS = 2400;
 const ROUND_DELAY_MS = 5000;
@@ -77,12 +80,25 @@ async function scanRound(round) {
       }
       await delay(DELAY_MS);
     }
-  } catch {}
+  } catch (e) {
+    console.error("❌ Error in scanRound:", e.message);
+  }
 }
 
+// ✅ BẮT BUỘC: Mở cổng HTTP để Render không timeout
+app.get("/", (req, res) => {
+  res.send("✅ Solana token tracker is running.");
+});
+
+app.listen(PORT, () => {
+  console.log(`🚀 Express server listening on port ${PORT}`);
+});
+
+// ✅ Khởi động vòng quét sau khi server đã sẵn sàng
 (async () => {
   let round = 1;
   while (true) {
+    console.log(`🔁 Scanning round ${round}`);
     await scanRound(round++);
     await delay(ROUND_DELAY_MS);
   }
