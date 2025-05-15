@@ -1,5 +1,6 @@
 import fetch from "node-fetch";
 import https from "https";
+import express from "express";
 
 const agent = new https.Agent({ rejectUnauthorized: false });
 
@@ -70,7 +71,7 @@ async function scanRound(round) {
             mint,
             currentPrice: price.value,
             lastUpdated: now.toISOString(),
-            scanTime: getLocalTime() // thêm giờ quét dạng HH:mm:ss
+            scanTime: getLocalTime()
           }),
           agent
         });
@@ -78,10 +79,11 @@ async function scanRound(round) {
       await delay(DELAY_MS);
     }
   } catch (err) {
-    // Không log lỗi luôn nếu muốn ẩn toàn bộ
+    // Không log gì cả
   }
 }
 
+// ✅ Vòng lặp liên tục
 (async () => {
   let round = 1;
   while (true) {
@@ -89,3 +91,13 @@ async function scanRound(round) {
     await delay(ROUND_DELAY_MS);
   }
 })();
+
+// ✅ Giữ app luôn hoạt động (tránh Render tắt app)
+const app = express();
+const PORT = process.env.PORT || 3000;
+app.get("/", (_, res) => {
+  res.send("✅ Worker still running at " + new Date().toLocaleTimeString("vi-VN", { hour12: false }));
+});
+app.listen(PORT, () => {
+  console.log(`✅ Ping server started at http://0.0.0.0:${PORT}`);
+});
