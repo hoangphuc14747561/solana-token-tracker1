@@ -12,6 +12,10 @@ function delay(ms) {
   return new Promise(res => setTimeout(res, ms));
 }
 
+function getLocalTime() {
+  return new Date().toLocaleTimeString("vi-VN", { hour12: false });
+}
+
 async function getRaydiumPairs() {
   try {
     const res = await fetch("https://api-v3.raydium.io/pairs");
@@ -58,13 +62,15 @@ async function scanRound(round) {
     for (const mint of mints) {
       const price = await getTokenPrice(mint, rayPairs);
       if (price) {
+        const now = new Date();
         await fetch("https://test.pumpvote.com/api/add-token-metadata", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             mint,
             currentPrice: price.value,
-            lastUpdated: new Date().toISOString()
+            lastUpdated: now.toISOString(),
+            scanTime: getLocalTime() // thêm giờ quét dạng HH:mm:ss
           }),
           agent
         });
