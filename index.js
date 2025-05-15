@@ -4,9 +4,8 @@ import https from "https";
 const agent = new https.Agent({ rejectUnauthorized: false });
 
 const WSOL = "So11111111111111111111111111111111111111112";
-const CONCURRENCY = 1;
-const DELAY_MS = 2400;
-const ROUND_DELAY_MS = 5000;
+const DELAY_MS = 2400;           // Delay giữa mỗi token (ms)
+const ROUND_DELAY_MS = 5000;     // Delay giữa mỗi vòng (ms)
 const AMOUNT = 100_000_000;
 
 function delay(ms) {
@@ -55,39 +54,32 @@ async function scanRound(round) {
     const tokens = await tokenRes.json();
     const mints = tokens.map(t => t.mint).filter(Boolean);
     const rayPairs = await getRaydiumPairs();
-    const queue = [...mints];
 
-    let scanned = 0;
     const total = mints.length;
+    let scanned = 0;
 
-    process.stdout.write(`🌀 Vòng ${round}: Bắt đầu quét ${total} token...\r`);
+    for (const mint of mints) {
+      const price = await getTokenPrice(mint, rayPairs);
 
-    async function worker() {
-      while (queue.length) {
-        const mint = queue.shift();
-        const price = await getTokenPrice(mint, rayPairs);
-
-        if (price) {
-          await fetch("https://test.pumpvote.com/api/add-token-metadata", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              mint,
-              currentPrice: price.value,
-              lastUpdated: new Date().toISOString()
-            }),
-            agent
-          });
-        }
-
-        scanned++;
-        process.stdout.write(`✅ Vòng ${round}: Đã quét ${scanned}/${total} token...\r`);
-        await delay(DELAY_MS);
+      if (price) {
+        await fetch("https://test.pumpvote.com/api/add-token-metadata", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mint,
+            currentPrice: price.value,
+            lastUpdated: new Date().toISOString()
+          }),
+          agent
+        });
       }
+
+      scanned++;
+      process.stdout.write(`\r✅ Vòng ${round}: Đã quét ${scanned}/${total} token...`);
+      await delay(DELAY_MS);
     }
 
-    await Promise.all(Array(CONCURRENCY).fill().map(() => worker()));
-    process.stdout.write(`✅ Vòng ${round} hoàn tất (${total}/${total})                \n`);
+    process.stdout.write(`\r✅ Vòng ${round} hoàn tất (${total}/${total})                 \n`);
   } catch (err) {
     console.error("❌ Scan error:", err.message);
   }
