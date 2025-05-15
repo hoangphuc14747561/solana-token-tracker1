@@ -3,9 +3,10 @@ const fetch = require("node-fetch");
 const https = require("https");
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000; // ✅ CHUẨN CHO RENDER
 
 const agent = new https.Agent({ rejectUnauthorized: false });
+
 const WSOL = "So11111111111111111111111111111111111111112";
 const DELAY_MS = 2400;
 const ROUND_DELAY_MS = 5000;
@@ -57,10 +58,11 @@ async function getTokenPrice(mint, rayPairs) {
 
 async function scanRound(round) {
   try {
-    const tokenRes = await fetch("https://test.pumpvote.com/api/token-metadata2", { agent });
-    const tokens = await tokenRes.json();
+    const res = await fetch("https://test.pumpvote.com/api/token-metadata2", { agent });
+    const tokens = await res.json();
     const mints = tokens.map(t => t.mint).filter(Boolean);
     const rayPairs = await getRaydiumPairs();
+    const scanTime = getLocalTime();
 
     for (const mint of mints) {
       const price = await getTokenPrice(mint, rayPairs);
@@ -73,33 +75,33 @@ async function scanRound(round) {
             mint,
             currentPrice: price.value,
             lastUpdated: now.toISOString(),
-            scanTime: getLocalTime()
+            scanTime
           }),
           agent
         });
       }
       await delay(DELAY_MS);
     }
-  } catch (e) {
-    console.error("❌ Error in scanRound:", e.message);
+  } catch (err) {
+    console.error("❌ Scan error:", err.message);
   }
 }
 
-// ✅ BẮT BUỘC: Mở cổng HTTP để Render không timeout
+// ✅ Tạo route để Render biết app đang chạy
 app.get("/", (req, res) => {
   res.send("✅ Solana token tracker is running.");
 });
 
+// ✅ Mở cổng đúng cách và bắt đầu quét sau khi app sống
 app.listen(PORT, () => {
-  console.log(`🚀 Express server listening on port ${PORT}`);
-});
+  console.log(`✅ Express server listening on port ${PORT}`);
 
-// ✅ Khởi động vòng quét sau khi server đã sẵn sàng
-(async () => {
   let round = 1;
-  while (true) {
-    console.log(`🔁 Scanning round ${round}`);
-    await scanRound(round++);
-    await delay(ROUND_DELAY_MS);
-  }
-})();
+  (async function loop() {
+    while (true) {
+      console.log(`🔁 Scanning round ${round++}`);
+      await scanRound(round);
+      await delay(ROUND_DELAY_MS);
+    }
+  })();
+});
