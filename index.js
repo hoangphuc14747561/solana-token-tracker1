@@ -4,8 +4,8 @@ import https from "https";
 const agent = new https.Agent({ rejectUnauthorized: false });
 
 const WSOL = "So11111111111111111111111111111111111111112";
-const DELAY_MS = 2400;           // Delay giữa mỗi token (ms)
-const ROUND_DELAY_MS = 5000;     // Delay giữa mỗi vòng (ms)
+const DELAY_MS = 2400;
+const ROUND_DELAY_MS = 5000;
 const AMOUNT = 100_000_000;
 
 function delay(ms) {
@@ -55,12 +55,8 @@ async function scanRound(round) {
     const mints = tokens.map(t => t.mint).filter(Boolean);
     const rayPairs = await getRaydiumPairs();
 
-    const total = mints.length;
-    let scanned = 0;
-
     for (const mint of mints) {
       const price = await getTokenPrice(mint, rayPairs);
-
       if (price) {
         await fetch("https://test.pumpvote.com/api/add-token-metadata", {
           method: "POST",
@@ -73,15 +69,10 @@ async function scanRound(round) {
           agent
         });
       }
-
-      scanned++;
-      process.stdout.write(`\r✅ Vòng ${round}: Đã quét ${scanned}/${total} token...`);
       await delay(DELAY_MS);
     }
-
-    process.stdout.write(`\r✅ Vòng ${round} hoàn tất (${total}/${total})                 \n`);
   } catch (err) {
-    console.error("❌ Scan error:", err.message);
+    // Không log lỗi luôn nếu muốn ẩn toàn bộ
   }
 }
 
