@@ -3,7 +3,8 @@ const fetch = require("node-fetch");
 const https = require("https");
 
 const app = express();
-const PORT = process.env.PORT || 3000; // ✅ CHUẨN CHO RENDER
+const PORT = process.env.PORT || 3000;
+const GROUP = process.env.GROUP || "group1"; // 👈 Cho phép truyền group động
 
 const agent = new https.Agent({ rejectUnauthorized: false });
 
@@ -58,8 +59,10 @@ async function getTokenPrice(mint, rayPairs) {
 
 async function scanRound(round) {
   try {
-    const res = await fetch("https://test.pumpvote.com/api/token-metadata2", { agent });
-    const tokens = await res.json();
+    const url = `https://test.pumpvote.com/api/group/${GROUP}?pending=true`;
+    const res = await fetch(url, { agent });
+    const data = await res.json();
+    const tokens = data.tokens || [];
     const mints = tokens.map(t => t.mint).filter(Boolean);
     const rayPairs = await getRaydiumPairs();
     const scanTime = getLocalTime();
@@ -87,19 +90,19 @@ async function scanRound(round) {
   }
 }
 
-// ✅ Tạo route để Render biết app đang chạy
+// ✅ Route xác nhận app sống
 app.get("/", (req, res) => {
-  res.send("✅ Solana token tracker is running.");
+  res.send(`✅ Worker cho group [${GROUP}] đang chạy.`);
 });
 
-// ✅ Mở cổng đúng cách và bắt đầu quét sau khi app sống
+// ✅ Start và quét lặp
 app.listen(PORT, () => {
-  console.log(`✅ Express server listening on port ${PORT}`);
+  console.log(`✅ WebCon (group=${GROUP}) listening on port ${PORT}`);
 
   let round = 1;
   (async function loop() {
     while (true) {
-      console.log(`🔁 Scanning round ${round++}`);
+      console.log(`🔁 Group ${GROUP} - Round ${round++}`);
       await scanRound(round);
       await delay(ROUND_DELAY_MS);
     }
