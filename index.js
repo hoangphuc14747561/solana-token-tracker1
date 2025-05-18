@@ -9,7 +9,7 @@ const WORKER_ID = process.env.WORKER || "webcon_001";
 const agent = new https.Agent({ rejectUnauthorized: false });
 
 const WSOL = "So11111111111111111111111111111111111111112";
-const DELAY_MS = 1400;
+const DELAY_MS = 2400;
 const ROUND_DELAY_MS = 500;
 const AMOUNT = 100_000_000;
 
