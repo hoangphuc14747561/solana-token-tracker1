@@ -4,7 +4,7 @@ const https = require("https");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const GROUP = process.env.GROUP || "group1"; // 👈 Cho phép truyền group động
+const WORKER_ID = process.env.WORKER || "webcon_001";
 
 const agent = new https.Agent({ rejectUnauthorized: false });
 
@@ -32,7 +32,6 @@ async function getRaydiumPairs() {
 
 async function getTokenPrice(mint, rayPairs) {
   let jupiter = null, raydium = null;
-
   try {
     const q = await fetch(`https://quote-api.jup.ag/v6/quote?inputMint=${mint}&outputMint=${WSOL}&amount=${AMOUNT}&slippageBps=300`);
     const data = await q.json();
@@ -59,50 +58,45 @@ async function getTokenPrice(mint, rayPairs) {
 
 async function scanRound(round) {
   try {
-    const url = `https://test.pumpvote.com/api/group/${GROUP}?pending=true`;
-    const res = await fetch(url, { agent });
-    const data = await res.json();
-    const tokens = data.tokens || [];
-    const mints = tokens.map(t => t.mint).filter(Boolean);
+    const workRes = await fetch(`https://test.pumpvote.com/api/work?worker=${WORKER_ID}`, { agent });
+    if (workRes.status === 204) return;
+    const token = await workRes.json();
+
     const rayPairs = await getRaydiumPairs();
     const scanTime = getLocalTime();
 
-    for (const mint of mints) {
-      const price = await getTokenPrice(mint, rayPairs);
-      if (price) {
-        const now = new Date();
-        await fetch("https://test.pumpvote.com/api/add-token-metadata", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            mint,
-            currentPrice: price.value,
-            lastUpdated: now.toISOString(),
-            scanTime
-          }),
-          agent
-        });
-      }
-      await delay(DELAY_MS);
+    const price = await getTokenPrice(token.mint, rayPairs);
+    if (price) {
+      const now = new Date();
+      await fetch("https://test.pumpvote.com/api/work", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mint: token.mint,
+          currentPrice: price.value,
+          scanTime,
+          worker: WORKER_ID
+        }),
+        agent
+      });
     }
+    await delay(DELAY_MS);
   } catch (err) {
     console.error("❌ Scan error:", err.message);
   }
 }
 
-// ✅ Route xác nhận app sống
 app.get("/", (req, res) => {
-  res.send(`✅ Worker cho group [${GROUP}] đang chạy.`);
+  res.send(`✅ WebCon [${WORKER_ID}] đang chạy.`);
 });
 
-// ✅ Start và quét lặp
 app.listen(PORT, () => {
-  console.log(`✅ WebCon (group=${GROUP}) listening on port ${PORT}`);
+  console.log(`✅ WebCon (worker=${WORKER_ID}) listening on port ${PORT}`);
 
   let round = 1;
   (async function loop() {
     while (true) {
-      console.log(`🔁 Group ${GROUP} - Round ${round++}`);
+      console.log(`🔁 Worker ${WORKER_ID} - Round ${round++}`);
       await scanRound(round);
       await delay(ROUND_DELAY_MS);
     }
