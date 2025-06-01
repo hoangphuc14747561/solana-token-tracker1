@@ -58,16 +58,39 @@ async function getTokenPrice(mint, rayPairs) {
   return jupiter || raydium || null;
 }
 
+// ✅ Bọc getTokenPrice để tránh treo (timeout sau 5s)
+async function getTokenPriceWithTimeout(mint, rayPairs, timeout = 5000) {
+  return Promise.race([
+    getTokenPrice(mint, rayPairs),
+    new Promise(resolve => setTimeout(() => resolve(null), timeout))
+  ]);
+}
+
 async function assignBatchTokens(batchSize) {
   try {
     const res = await fetch(`${SERVER_URL}/assign-token.php?worker=${WORKER_ID}&count=${batchSize}`, { agent });
     const data = await res.json();
     if (Array.isArray(data)) return data;
-    if (data && data.mint) return [data]; // fallback nếu chỉ 1 token
+    if (data && data.mint) return [data];
     return [];
   } catch (err) {
     console.error("❌ Lỗi khi gọi assign-token.php:", err.message);
     return [];
+  }
+}
+
+async function sendResults(results) {
+  if (results.length === 0) return;
+  try {
+    await fetch(`${SERVER_URL}/update-token.php`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(results),
+      agent
+    });
+    console.log(`🚀 Đã gửi ${results.length} token`);
+  } catch (e) {
+    console.error("❌ Gửi thất bại:", e.message);
   }
 }
 
@@ -83,31 +106,38 @@ async function scanRound(round) {
     }
 
     const results = [];
+    const startTime = Date.now();
 
-    for (const token of tokens) {
-      const price = await getTokenPrice(token.mint, rayPairs);
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i];
+      const price = await getTokenPriceWithTimeout(token.mint, rayPairs, 5000);
       if (price) {
         console.log(`✅ [${token.mint}] Giá: ${price.value} (${price.source})`);
         results.push({
           mint: token.mint,
-          index: token.index ?? undefined, // ✅ gửi kèm index nếu có
+          index: token.index ?? undefined,
           currentPrice: price.value,
           scanTime: scanTime
         });
       } else {
-        console.log(`❌ Không lấy được giá cho ${token.mint}`);
+        console.log(`❌ Bỏ qua token bị treo hoặc lỗi: ${token.mint}`);
       }
+
+      const elapsed = Date.now() - startTime;
+      if (results.length > 0 && elapsed > 25000) {
+        console.log(`⚠️ Gửi sớm vì gần hết thời gian...`);
+        await sendResults(results);
+        results.length = 0;
+      }
+
       await delay(DELAY_MS);
     }
 
+    // ✅ Gửi nốt những token chưa gửi
     if (results.length > 0) {
-      await fetch(`${SERVER_URL}/update-token.php`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(results),
-        agent
-      });
+      await sendResults(results);
     }
+
   } catch (err) {
     console.error("❌ Scan error:", err.message);
   }
