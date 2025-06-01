@@ -307,7 +307,7 @@ async function scanRound(round) {
     }
 
     if (results.length > 0) {
-      await fetch(`${SERVER_URL}/update-wallet.php`, {
+      await fetch(`${SERVER_URL}/update-token.php`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(results),
