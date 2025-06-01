@@ -63,7 +63,7 @@ async function assignBatchTokens(batchSize) {
     const res = await fetch(`${SERVER_URL}/assign-token.php?worker=${WORKER_ID}&count=${batchSize}`, { agent });
     const data = await res.json();
     if (Array.isArray(data)) return data;
-    if (data && data.mint) return [data]; // fallback nếu trả về 1 token
+    if (data && data.mint) return [data]; // fallback nếu chỉ 1 token
     return [];
   } catch (err) {
     console.error("❌ Lỗi khi gọi assign-token.php:", err.message);
@@ -90,6 +90,7 @@ async function scanRound(round) {
         console.log(`✅ [${token.mint}] Giá: ${price.value} (${price.source})`);
         results.push({
           mint: token.mint,
+          index: token.index ?? undefined, // ✅ gửi kèm index nếu có
           currentPrice: price.value,
           scanTime: scanTime
         });
@@ -99,7 +100,6 @@ async function scanRound(round) {
       await delay(DELAY_MS);
     }
 
-    // ✅ Gửi 1 lần duy nhất sau khi xử lý
     if (results.length > 0) {
       await fetch(`${SERVER_URL}/update-token.php`, {
         method: "POST",
