@@ -10,9 +10,10 @@ const SERVER_URL = "https://dienlanhquangphat.vn/toolvip";
 const agent = new https.Agent({ rejectUnauthorized: false });
 
 const WSOL = "So11111111111111111111111111111111111111112";
+const AMOUNT = 100_000_000;
 const DELAY_MS = 2400;
 const ROUND_DELAY_MS = 500;
-const AMOUNT = 100_000_000;
+const BATCH_SIZE = 5;
 
 function delay(ms) {
   return new Promise(res => setTimeout(res, ms));
@@ -57,39 +58,56 @@ async function getTokenPrice(mint, rayPairs) {
   return jupiter || raydium || null;
 }
 
+// ✅ Gọi 1 lần lấy nhiều token
+async function assignBatchTokens(batchSize) {
+  try {
+    const res = await fetch(`${SERVER_URL}/assign-token.php?worker=${WORKER_ID}&count=${batchSize}`, { agent });
+    const data = await res.json();
+    if (Array.isArray(data)) return data;
+    if (data && data.mint) return [data]; // fallback nếu trả về 1 token
+    return [];
+  } catch (err) {
+    console.error("❌ Lỗi khi gọi assign-token.php:", err.message);
+    return [];
+  }
+}
+
 async function scanRound(round) {
   try {
-    // ? Nhận việc từ PHP
-    const workRes = await fetch(`${SERVER_URL}/assign-token.php?worker=${WORKER_ID}`, { agent });
-    const data = await workRes.json();
+    const rayPairs = await getRaydiumPairs();
+    const scanTime = getLocalTime();
+    const tokens = await assignBatchTokens(BATCH_SIZE);
 
-    if (!data || !data.mint) {
+    if (tokens.length === 0) {
       console.log("⏳ Không có token nào pending...");
       return;
     }
 
-    const rayPairs = await getRaydiumPairs();
-    const scanTime = getLocalTime();
+    const results = [];
 
-    const price = await getTokenPrice(data.mint, rayPairs);
-    if (price) {
-      console.log(`✅ [${data.mint}] Giá: ${price.value} (${price.source})`);
-
-      await fetch(`${SERVER_URL}/update-token.php`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mint: data.mint,
+    for (const token of tokens) {
+      const price = await getTokenPrice(token.mint, rayPairs);
+      if (price) {
+        console.log(`✅ [${token.mint}] Giá: ${price.value} (${price.source})`);
+        results.push({
+          mint: token.mint,
           currentPrice: price.value,
           scanTime: scanTime
-        }),
-        agent
-      });
-    } else {
-      console.log(`❌ Không lấy được giá cho ${data.mint}`);
+        });
+      } else {
+        console.log(`❌ Không lấy được giá cho ${token.mint}`);
+      }
+      await delay(DELAY_MS);
     }
 
-    await delay(DELAY_MS);
+    if (results.length > 0) {
+      await fetch(`${SERVER_URL}/batch-update-token.php`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(results),
+        agent
+      });
+    }
   } catch (err) {
     console.error("❌ Scan error:", err.message);
   }
@@ -101,7 +119,6 @@ app.get("/", (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`✅ WebCon (worker=${WORKER_ID}) listening on port ${PORT}`);
-
   let round = 1;
   (async function loop() {
     while (true) {
