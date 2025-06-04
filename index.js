@@ -9,7 +9,6 @@ const WORKER_ID = process.env.WORKER || "webcon_001";
 const SERVER_URL = "https://dienlanhquangphat.vn/toolvip";
 const agent = new https.Agent({ rejectUnauthorized: false });
 
-// ===== Cấu hình chính =====
 const WSOL = "So11111111111111111111111111111111111111112";
 const DELAY_MS = 2400;
 const ROUND_DELAY_MS = 500;
@@ -18,7 +17,6 @@ const AMOUNT = 100_000_000;
 
 let rpcUrls = [];
 
-// ===== Đọc danh sách RPC từ apikeys.txt =====
 function loadRpcUrls() {
   try {
     const raw = fs.readFileSync("apikeys.txt", "utf-8");
@@ -30,10 +28,8 @@ function loadRpcUrls() {
   }
 }
 
-// ===== Hàm delay =====
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
-// ===== Gọi RPC JSON =====
 async function callRpc(rpcUrl, method, params) {
   try {
     const res = await fetch(rpcUrl, {
@@ -47,7 +43,6 @@ async function callRpc(rpcUrl, method, params) {
   }
 }
 
-// ===== Lấy giá token qua QuickNode RPC =====
 async function getTokenPriceViaQuickNode(mint, rpcUrl) {
   try {
     const largest = await callRpc(rpcUrl, "getTokenLargestAccounts", [mint]);
@@ -77,7 +72,6 @@ async function getTokenPriceViaQuickNode(mint, rpcUrl) {
   return null;
 }
 
-// ===== Bọc timeout =====
 async function getTokenPriceWithTimeout(mint, timeout = 5000) {
   const rpc = rpcUrls[Math.floor(Math.random() * rpcUrls.length)];
   return Promise.race([
@@ -86,7 +80,6 @@ async function getTokenPriceWithTimeout(mint, timeout = 5000) {
   ]);
 }
 
-// ===== Gọi token từ server =====
 async function assignBatchTokens(batchSize) {
   try {
     const res = await fetch(`${SERVER_URL}/assign-token.php?worker=${WORKER_ID}&count=${batchSize}`, { agent });
@@ -100,7 +93,6 @@ async function assignBatchTokens(batchSize) {
   }
 }
 
-// ===== Gửi kết quả về server =====
 async function sendResults(results) {
   if (!results.length) return;
   try {
@@ -110,22 +102,17 @@ async function sendResults(results) {
       body: JSON.stringify(results),
       agent,
     });
-    console.log(`🚀 Gửi ${results.length} token thành công`);
+    console.log(`📤 Gửi ${results.length} token thành công`);
   } catch (err) {
     console.error("❌ Gửi dữ liệu thất bại:", err.message);
   }
 }
 
-// ===== Quét từng vòng =====
 async function scanRound(round) {
-  console.log(`🔁 Round ${round}`);
   const scanTime = new Date().toLocaleTimeString("vi-VN", { hour12: false });
   const tokens = await assignBatchTokens(BATCH_SIZE);
 
-  if (!tokens.length) {
-    console.log("⏳ Không có token nào đang pending...");
-    return;
-  }
+  if (!tokens.length) return;
 
   const results = [];
   const start = Date.now();
@@ -133,7 +120,6 @@ async function scanRound(round) {
   for (const token of tokens) {
     const price = await getTokenPriceWithTimeout(token.mint);
     if (price) {
-      console.log(`✅ [${token.mint}] Giá: ${price.value} (${price.source})`);
       results.push({
         mint: token.mint,
         index: token.index ?? undefined,
@@ -141,11 +127,10 @@ async function scanRound(round) {
         scanTime
       });
     } else {
-      console.log(`❌ [${token.mint}] Lỗi hoặc không có pool`);
+      console.error(`❌ Không lấy được giá: ${token.mint}`);
     }
 
     if (Date.now() - start > 25000 && results.length > 0) {
-      console.log(`⚠️ Gửi sớm để tránh timeout`);
       await sendResults(results);
       results.length = 0;
     }
@@ -158,7 +143,6 @@ async function scanRound(round) {
   }
 }
 
-// ===== Khởi chạy Express + Loop =====
 app.get("/", (req, res) => {
   res.send(`✅ WebCon [${WORKER_ID}] đang chạy`);
 });
