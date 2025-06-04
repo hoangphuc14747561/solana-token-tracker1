@@ -17,6 +17,7 @@ const AMOUNT = 100_000_000;
 
 let rpcUrls = [];
 
+// ===== Đọc danh sách RPC từ apikeys.txt =====
 function loadRpcUrls() {
   try {
     const raw = fs.readFileSync("apikeys.txt", "utf-8");
@@ -28,8 +29,10 @@ function loadRpcUrls() {
   }
 }
 
+// ===== Hàm delay =====
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
+// ===== Gọi RPC JSON =====
 async function callRpc(rpcUrl, method, params) {
   try {
     const res = await fetch(rpcUrl, {
@@ -43,6 +46,7 @@ async function callRpc(rpcUrl, method, params) {
   }
 }
 
+// ===== Lấy giá token qua QuickNode RPC =====
 async function getTokenPriceViaQuickNode(mint, rpcUrl) {
   try {
     const largest = await callRpc(rpcUrl, "getTokenLargestAccounts", [mint]);
@@ -72,6 +76,7 @@ async function getTokenPriceViaQuickNode(mint, rpcUrl) {
   return null;
 }
 
+// ===== Bọc timeout =====
 async function getTokenPriceWithTimeout(mint, timeout = 5000) {
   const rpc = rpcUrls[Math.floor(Math.random() * rpcUrls.length)];
   return Promise.race([
@@ -80,19 +85,28 @@ async function getTokenPriceWithTimeout(mint, timeout = 5000) {
   ]);
 }
 
+// ===== Gọi token từ server =====
 async function assignBatchTokens(batchSize) {
   try {
     const res = await fetch(`${SERVER_URL}/assign-token.php?worker=${WORKER_ID}&count=${batchSize}`, { agent });
+
+    if (res.status === 204) {
+      // Không có token => không log
+      return [];
+    }
+
     const data = await res.json();
     if (Array.isArray(data)) return data;
     if (data && data.mint) return [data];
     return [];
+
   } catch (err) {
     console.error("❌ Gọi assign-token thất bại:", err.message);
     return [];
   }
 }
 
+// ===== Gửi kết quả về server =====
 async function sendResults(results) {
   if (!results.length) return;
   try {
@@ -108,6 +122,7 @@ async function sendResults(results) {
   }
 }
 
+// ===== Quét từng vòng =====
 async function scanRound(round) {
   const scanTime = new Date().toLocaleTimeString("vi-VN", { hour12: false });
   const tokens = await assignBatchTokens(BATCH_SIZE);
@@ -143,6 +158,7 @@ async function scanRound(round) {
   }
 }
 
+// ===== Khởi chạy Express + Loop =====
 app.get("/", (req, res) => {
   res.send(`✅ WebCon [${WORKER_ID}] đang chạy`);
 });
