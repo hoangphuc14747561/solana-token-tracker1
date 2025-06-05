@@ -16,6 +16,7 @@ const BATCH_SIZE = 5;
 const AMOUNT = 100_000_000;
 
 let rpcUrls = [];
+let rpcIndex = 0; // 🔁 Biến chỉ số round-robin
 
 function loadRpcUrls() {
   try {
@@ -23,8 +24,16 @@ function loadRpcUrls() {
     rpcUrls = raw.trim().split("\n").filter(Boolean);
     if (rpcUrls.length === 0) throw new Error("Không có RPC nào trong file.");
   } catch (e) {
+    console.error("Lỗi đọc apikeys.txt:", e.message);
     process.exit(1);
   }
+}
+
+function getNextRpcUrl() {
+  if (rpcUrls.length === 0) return null;
+  const url = rpcUrls[rpcIndex];
+  rpcIndex = (rpcIndex + 1) % rpcUrls.length;
+  return url;
 }
 
 const delay = ms => new Promise(res => setTimeout(res, ms));
@@ -72,7 +81,7 @@ async function getTokenPriceViaQuickNode(mint, rpcUrl) {
 }
 
 async function getTokenPriceWithTimeout(mint, timeout = 5000) {
-  const rpc = rpcUrls[Math.floor(Math.random() * rpcUrls.length)];
+  const rpc = getNextRpcUrl(); // ✅ dùng round-robin
   return Promise.race([
     getTokenPriceViaQuickNode(mint, rpc),
     new Promise(resolve => setTimeout(() => resolve(null), timeout))
@@ -133,7 +142,6 @@ async function scanRound(round) {
 
   if (results.length > 0) {
     await sendResults(results);
-    results.length = 0;
   }
 }
 
