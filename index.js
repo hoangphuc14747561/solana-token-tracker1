@@ -13,10 +13,10 @@ const WSOL = "So11111111111111111111111111111111111111112";
 const DELAY_MS = 2400;
 const ROUND_DELAY_MS = 500;
 const BATCH_SIZE = 5;
-const AMOUNT = 100_000_000;
+const RAM_LIMIT_MB = 300;
 
 let rpcUrls = [];
-let rpcIndex = 0; // 🔁 Biến chỉ số round-robin
+let rpcIndex = 0;
 
 function loadRpcUrls() {
   try {
@@ -24,7 +24,7 @@ function loadRpcUrls() {
     rpcUrls = raw.trim().split("\n").filter(Boolean);
     if (rpcUrls.length === 0) throw new Error("Không có RPC nào trong file.");
   } catch (e) {
-    console.error("Lỗi đọc apikeys.txt:", e.message);
+    console.error("❌ Lỗi đọc apikeys.txt:", e.message);
     process.exit(1);
   }
 }
@@ -62,6 +62,7 @@ async function getTokenPriceViaQuickNode(mint, rpcUrl) {
     const parsed = accInfo?.result?.value?.data?.parsed?.info;
     const owner = parsed?.owner;
     const tokenAmount = parseFloat(parsed?.tokenAmount?.uiAmount || "0");
+
     if (!owner || tokenAmount === 0) return null;
 
     const wsolInfo = await callRpc(rpcUrl, "getTokenAccountsByOwner", [
@@ -69,6 +70,7 @@ async function getTokenPriceViaQuickNode(mint, rpcUrl) {
       { mint: WSOL },
       { encoding: "jsonParsed" },
     ]);
+
     const wsolAmount = parseFloat(
       wsolInfo?.result?.value?.[0]?.account?.data?.parsed?.info?.tokenAmount?.uiAmount || "0"
     );
@@ -81,7 +83,7 @@ async function getTokenPriceViaQuickNode(mint, rpcUrl) {
 }
 
 async function getTokenPriceWithTimeout(mint, timeout = 5000) {
-  const rpc = getNextRpcUrl(); // ✅ dùng round-robin
+  const rpc = getNextRpcUrl();
   return Promise.race([
     getTokenPriceViaQuickNode(mint, rpc),
     new Promise(resolve => setTimeout(() => resolve(null), timeout))
@@ -132,6 +134,7 @@ async function scanRound(round) {
       });
     }
 
+    // Gửi từng batch nhỏ nếu chạy lâu
     if (Date.now() - start > 25000 && results.length > 0) {
       await sendResults(results);
       results.length = 0;
@@ -145,12 +148,23 @@ async function scanRound(round) {
   }
 }
 
+function monitorMemoryAndRestart() {
+  setInterval(() => {
+    const usedMB = process.memoryUsage().rss / 1024 / 1024;
+    if (usedMB > RAM_LIMIT_MB) {
+      process.exit(0);
+    }
+  }, 60000); // kiểm tra mỗi phút
+}
+
 app.get("/", (req, res) => {
   res.send(`✅ WebCon [${WORKER_ID}] đang chạy`);
 });
 
 app.listen(PORT, () => {
   loadRpcUrls();
+  monitorMemoryAndRestart();
+
   let round = 1;
   (async function loop() {
     while (true) {
